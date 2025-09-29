@@ -63,17 +63,19 @@ class ManajemenFoto extends BaseController
         if (!$this->drive) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'Gagal terhubung ke Google Drive. Periksa file log untuk detail.']);
         }
+        
+        $files = $this->request->getFiles();
 
-        $username = $this->request->getPost('username');
-        $no_telepon = $this->request->getPost('no_telepon');
-        $tahun = $this->request->getPost('tahun');
-        $kategori = $this->request->getPost('kategori');
-        $sub_kategori = $this->request->getPost('sub_kategori');
-        $files = $this->request->getFiles('files');
-
-        if (empty($username) || empty($no_telepon) || empty($tahun) || empty($kategori) || !$files || empty($files['files'][0]->getName())) {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'Semua field harus diisi.']);
+        if (empty($files['files'])) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'File foto tidak ditemukan dalam permintaan.']);
         }
+
+        $username     = $this->request->getPost('username') ?: 'TIDAK DIKETAHUI';
+        $no_telepon   = $this->request->getPost('no_telepon') ?: '0000';
+        $tahun        = $this->request->getPost('tahun') ?: date('Y');
+        $kategori     = $this->request->getPost('kategori') ?: 'TANPA KATEGORI';
+        $sub_kategori = $this->request->getPost('sub_kategori');
+
 
         try {
             $petugasModel = new PetugasModel();
@@ -87,11 +89,10 @@ class ManajemenFoto extends BaseController
             }
             $id_petugas = $petugas['id_petugas'];
 
-            $pathArray = [$tahun, $kategori];
+            $pathArray = [$tahun, $kategori, $username];
             if ($kategori === 'BIBIT PERSEMAIAN PERMANEN' && !empty($sub_kategori)) {
-                $pathArray[] = $sub_kategori;
+                array_splice($pathArray, 2, 0, $sub_kategori);
             }
-            $pathArray[] = $username;
 
             $folderId = $this->getOrCreateNestedFolder($pathArray);
             if (!$folderId) {
@@ -100,15 +101,21 @@ class ManajemenFoto extends BaseController
 
             $fotoModel = new FotoModel();
             $processedCount = 0;
-            foreach ($files['files'] as $file) {
-                if ($file->isValid() && !$file->hasMoved()) {
-                    $this->processAndUploadImage($file->getTempName(), $id_petugas, $fotoModel, $folderId, $file->getClientName());
+            
+            $file = $files['files'];
+
+            if ($file->isValid() && !$file->hasMoved()) {
+                $result = $this->processAndUploadImage($file->getTempName(), $id_petugas, $fotoModel, $folderId, $file->getClientName());
+                if ($result) {
                     $processedCount++;
+                } else {
+                    return $this->response->setJSON(['status' => 'error', 'message' => 'Gagal memproses EXIF atau mengupload file: ' . $file->getClientName()]);
                 }
             }
-            return $this->response->setJSON(['status' => 'success', 'processed' => $processedCount]);
+            
+            return $this->response->setJSON(['status' => 'success', 'processed' => $processedCount, 'fileName' => $file->getClientName()]);
         } catch (\Exception $e) {
-            log_message('error', '[Upload Error] ' . $e->getMessage());
+            log_message('error', '[Upload Error] ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
             return $this->response->setJSON(['status' => 'error', 'message' => 'Terjadi kesalahan di server: ' . $e->getMessage()]);
         }
     }
@@ -152,58 +159,120 @@ class ManajemenFoto extends BaseController
             return $folder->id;
         }
     }
-
+    
     private function processAndUploadImage($filePath, $id_petugas, $fotoModel, $driveFolderId, $originalName = null)
     {
-        $exif = @exif_read_data($filePath);
-        $fileName = $originalName ?? basename($filePath);
+        try {
+            $exif = @exif_read_data($filePath);
+            $fileName = $originalName ?? basename($filePath);
 
-        $fileMetadata = new \Google_Service_Drive_DriveFile([
-            'name' => $fileName,
-            'parents' => [$driveFolderId]
-        ]);
-        $content = file_get_contents($filePath);
-        $file = $this->drive->files->create($fileMetadata, [
-            'data' => $content,
-            'mimeType' => mime_content_type($filePath),
-            'uploadType' => 'multipart',
-            'fields' => 'id, webViewLink'
-        ]);
-        
-        $dbData = [
-            'id_petugas' => $id_petugas,
-            'nama_file' => $fileName,
-            'path_file' => $file->webViewLink,
-            'ukuran_file' => filesize($filePath),
-            'format_file' => mime_content_type($filePath),
-            'tanggal_dibuat' => !empty($exif['DateTimeOriginal']) ? date('Y-m-d H:i:s', strtotime($exif['DateTimeOriginal'])) : null,
-            'kamera_merek' => $exif['Make'] ?? null,
-            'kamera_model' => $exif['Model'] ?? null,
-            'orientasi' => $exif['Orientation'] ?? null,
-        ];
+            $fileMetadata = new \Google_Service_Drive_DriveFile([
+                'name' => $fileName,
+                'parents' => [$driveFolderId]
+            ]);
+            $content = file_get_contents($filePath);
+            $file = $this->drive->files->create($fileMetadata, [
+                'data' => $content,
+                'mimeType' => mime_content_type($filePath),
+                'uploadType' => 'multipart',
+                'fields' => 'id, webViewLink'
+            ]);
+            
+            $dbData = [
+                'id_petugas' => $id_petugas,
+                'nama_file' => $fileName,
+                'path_file' => $file->webViewLink,
+                'ukuran_file' => filesize($filePath),
+                'format_file' => mime_content_type($filePath),
+                'tanggal_dibuat' => !empty($exif['DateTimeOriginal']) ? date('Y-m-d H:i:s', strtotime($exif['DateTimeOriginal'])) : null,
+                'kamera_merek' => $exif['Make'] ?? null,
+                'kamera_model' => $exif['Model'] ?? null,
+                'orientasi' => $exif['Orientation'] ?? null,
+            ];
 
-        if (!empty($exif['GPSLatitude']) && !empty($exif['GPSLongitude'])) {
-            $dbData['gps_latitude'] = $this->convertGpsToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef']);
-            $dbData['gps_longitude'] = $this->convertGpsToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef']);
-            $dbData['gps_altitude'] = !empty($exif['GPSAltitude']) ? eval('return ' . $exif['GPSAltitude'] . ';') : null;
+            if (!empty($exif['GPSLatitude']) && !empty($exif['GPSLongitude'])) {
+                $lat = $this->convertGpsToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef']);
+                $lon = $this->convertGpsToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef']);
+                $alt = !empty($exif['GPSAltitude']) ? $this->_gpsToFloat($exif['GPSAltitude']) : null;
+                
+                // --- PERBAIKAN FINAL: Validasi menggunakan filter_var untuk keamanan maksimum ---
+                $dbData['gps_latitude']  = filter_var($lat, FILTER_VALIDATE_FLOAT) ? $lat : null;
+                $dbData['gps_longitude'] = filter_var($lon, FILTER_VALIDATE_FLOAT) ? $lon : null;
+                $dbData['gps_altitude']  = filter_var($alt, FILTER_VALIDATE_FLOAT) ? $alt : null;
+            }
+
+            if (!empty($dbData['gps_latitude']) && !empty($dbData['gps_longitude'])) {
+                $dbData['lokasi'] = $this->getAlamatDariKoordinat($dbData['gps_latitude'], $dbData['gps_longitude']);
+            }
+            
+            $fotoModel->save($dbData);
+            return true;
+
+        } catch (\Exception $e) {
+            log_message('error', "Gagal memproses file {$originalName}: " . $e->getMessage());
+            return false;
         }
-
-        // --- PENAMBAHAN KODE BARU DIMULAI DI SINI ---
-        if (!empty($dbData['gps_latitude']) && !empty($dbData['gps_longitude'])) {
-            // Panggil fungsi baru untuk mendapatkan alamat dari koordinat
-            $dbData['lokasi'] = $this->getAlamatDariKoordinat($dbData['gps_latitude'], $dbData['gps_longitude']);
-        }
-        // --- PENAMBAHAN KODE BARU SELESAI ---
-        
-        $fotoModel->save($dbData);
     }
 
+    /**
+     * --- FUNGSI BARU (LEBIH AMAN) ---
+     * Mengonversi nilai pecahan dari EXIF (contoh: "7/1" atau "5591/100") menjadi angka float.
+     * @param string|null $value Nilai dari EXIF
+     * @return float|null Mengembalikan float jika valid, null jika tidak.
+     */
+    private function _gpsToFloat($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        if (is_string($value) && strpos($value, '/') !== false) {
+            list($numerator, $denominator) = explode('/', $value, 2);
+            
+            // Validasi bahwa keduanya adalah numerik
+            if (!is_numeric($numerator) || !is_numeric($denominator)) {
+                return null;
+            }
+            
+            $numerator = (float) $numerator;
+            $denominator = (float) $denominator;
+
+            // Mencegah error "Division by zero"
+            if ($denominator == 0) {
+                return null;
+            }
+
+            return $numerator / $denominator;
+        }
+
+        return null;
+    }
+
+
+    /**
+     * --- FUNGSI LAMA (DIPERBARUI TOTAL) ---
+     * Fungsi yang jauh lebih tahan banting untuk mengonversi data GPS.
+     */
     private function convertGpsToDecimal($dmsArray, $hemisphere)
     {
-        $degrees = count($dmsArray) > 0 ? eval('return ' . $dmsArray[0] . ';') : 0;
-        $minutes = count($dmsArray) > 1 ? eval('return ' . $dmsArray[1] . ';') : 0;
-        $seconds = count($dmsArray) > 2 ? eval('return ' . $dmsArray[2] . ';') : 0;
+        // Pastikan inputnya adalah array
+        if (!is_array($dmsArray)) {
+            return null;
+        }
+
+        $degrees = count($dmsArray) > 0 ? $this->_gpsToFloat($dmsArray[0]) : 0;
+        $minutes = count($dmsArray) > 1 ? $this->_gpsToFloat($dmsArray[1]) : 0;
+        $seconds = count($dmsArray) > 2 ? $this->_gpsToFloat($dmsArray[2]) : 0;
         
+        // Jika salah satu komponen gagal dikonversi, batalkan seluruh proses.
+        if ($degrees === null || $minutes === null || $seconds === null) {
+            return null;
+        }
+
         $decimal = $degrees + ($minutes / 60) + ($seconds / 3600);
         
         if ($hemisphere === 'S' || $hemisphere === 'W') {
@@ -212,24 +281,15 @@ class ManajemenFoto extends BaseController
         
         return $decimal;
     }
-
-    // --- FUNGSI BARU UNTUK MENGAMBIL ALAMAT ---
-    /**
-     * Mengambil alamat fisik dari koordinat GPS menggunakan OpenStreetMap Nominatim API.
-     * @param float $latitude
-     * @param float $longitude
-     * @return string|null Alamat lengkap atau null jika gagal.
-     */
+    
     private function getAlamatDariKoordinat($latitude, $longitude)
     {
         try {
-            // Siapkan HTTP client
             $client = \Config\Services::curlrequest([
                 'baseURI' => 'https://nominatim.openstreetmap.org/',
-                'timeout' => 10, // Waktu tunggu 10 detik
+                'timeout' => 10,
             ]);
 
-            // Buat request ke API Nominatim
             $response = $client->request('GET', 'reverse', [
                 'query' => [
                     'format' => 'json',
@@ -239,24 +299,21 @@ class ManajemenFoto extends BaseController
                     'addressdetails' => 1
                 ],
                 'headers' => [
-                    // API Nominatim memerlukan User-Agent yang valid
                     'User-Agent' => 'AplikasiGeotagging/1.0 (' . base_url() . ')'
                 ]
             ]);
 
-            // Proses hasilnya jika request berhasil
             if ($response->getStatusCode() === 200) {
                 $body = json_decode($response->getBody());
                 if (isset($body->display_name)) {
-                    return $body->display_name; // Kembalikan alamat lengkap
+                    return $body->display_name;
                 }
             }
-            return null; // Kembalikan null jika tidak ada alamat atau error
+            return null;
 
         } catch (\Exception $e) {
             log_message('error', 'Gagal melakukan Reverse Geocoding: ' . $e->getMessage());
-            return null; // Kembalikan null jika terjadi exception
+            return null;
         }
     }
 }
-

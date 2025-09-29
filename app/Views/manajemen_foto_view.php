@@ -17,7 +17,7 @@
             color: #fff;
             font-family: monospace;
             font-size: 0.85rem;
-            height: 200px;
+            height: 300px;
             overflow-y: scroll;
             padding: 10px;
             border-radius: 5px;
@@ -26,14 +26,9 @@
 </head>
 
 <body>
-
     <nav class="navbar navbar-dark bg-dark shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">
-                <i class="fas fa-camera"></i>
-                Manajemen Foto
-            </a>
-            <a href="/logout" class="btn btn-outline-light">Logout</a>
+            <a class="navbar-brand" href="#"><i class="fas fa-camera"></i> Manajemen Foto</a>
         </div>
     </nav>
 
@@ -41,52 +36,53 @@
         <div class="card">
             <div class="card-body">
                 <h4 class="card-title">Upload Foto Geotagging Baru</h4>
-                <p class="card-subtitle mb-3 text-muted">Pilih tujuan upload dan masukkan username Anda.</p>
+                <p class="card-subtitle mb-3 text-muted">Pilih detail, username, dan pilih semua foto yang akan diupload. Field selain foto bersifat opsional.</p>
 
                 <form id="uploadForm">
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label for="tahun" class="form-label"><b>Tahun</b></label>
-                            <select class="form-select" id="tahun" name="tahun" required>
-                                <option value="" disabled selected>-- Pilih Tahun --</option>
-                                <option value="2025">2025</option>
-                                <option value="2026">2026</option>
-                                <option value="2027">2027</option>
+                    <!-- Menambahkan CSRF field untuk keamanan -->
+                    <?= csrf_field() ?>
+                    <fieldset id="form-fieldset">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="tahun" class="form-label"><b>Tahun</b></label>
+                                <!-- PERBAIKAN: Daftar tahun sekarang statis sesuai permintaan -->
+                                <select class="form-select" id="tahun" name="tahun">
+                                    <option value="" disabled selected>-- Pilih Tahun --</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026">2026</option>
+                                    <option value="2027">2027</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label for="kategori" class="form-label"><b>Kategori</b></label>
+                                <select class="form-select" id="kategori" name="kategori">
+                                    <option value="" disabled selected>-- Pilih Kategori --</option>
+                                    <option value="BIBIT PERSEMAIAN PERMANEN">BIBIT PERSEMAIAN PERMANEN</option>
+                                    <option value="BIBIT PRODUKTIF">BIBIT PRODUKTIF</option>
+                                    <option value="BIBIT KEBUN BIBIT RAKYAT (KBR)">BIBIT KEBUN BIBIT RAKYAT (KBR)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3" id="subKategoriWrapper" style="display: none;">
+                            <label for="sub_kategori" class="form-label"><b>Sub-Kategori Persemaian</b></label>
+                            <select class="form-select" id="sub_kategori" name="sub_kategori">
+                                <option value="PP Sungai Selamat">PP Sungai Selamat</option>
+                                <option value="PP Nanga Pinoh">PP Nanga Pinoh</option>
                             </select>
                         </div>
-                        <div class="col-md-8 mb-3">
-                            <label for="kategori" class="form-label"><b>Kategori</b></label>
-                            <select class="form-select" id="kategori" name="kategori" required>
-                                <option value="" disabled selected>-- Pilih Kategori --</option>
-                                <option value="BIBIT PERSEMAIAN PERMANEN">BIBIT PERSEMAIAN PERMANEN</option>
-                                <option value="BIBIT PRODUKTIF">BIBIT PRODUKTIF</option>
-                                <option value="BIBIT KEBUN BIBIT RAKYAT (KBR)">BIBIT KEBUN BIBIT RAKYAT (KBR)</option>
-                            </select>
+                        <div class="mb-3">
+                            <label for="username" class="form-label"><b>Username Pengirim</b></label>
+                            <input type="text" class="form-control" name="username" id="username" placeholder="Kosongkan jika tidak diketahui">
                         </div>
-                    </div>
-                    <div class="mb-3" id="subKategoriWrapper" style="display: none;">
-                        <label for="sub_kategori" class="form-label"><b>Sub-Kategori Persemaian</b></label>
-                        <select class="form-select" id="sub_kategori" name="sub_kategori">
-                            <option value="PP Sungai Selamat">PP Sungai Selamat</option>
-                            <option value="PP Nanga Pinoh">PP Nanga Pinoh</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="username" class="form-label"><b>Username Petugas</b></label>
-                        <input type="text" class="form-control" name="username" id="username" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="no_telepon" class="form-label"><b>Nomor Telepon</b></label>
-                        <input type="tel" class="form-control" name="no_telepon" id="no_telepon" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="files" class="form-label"><b>Pilih Foto</b></label>
-                        <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png">
-                    </div>
-
+                        <div class="mb-3">
+                            <label for="no_telepon" class="form-label"><b>Nomor Telepon Pengirim</b></label>
+                            <input type="tel" class="form-control" name="no_telepon" id="no_telepon" placeholder="Kosongkan jika tidak diketahui">
+                        </div>
+                        <div class="mb-3">
+                            <label for="files" class="form-label"><b>Pilih Foto (Wajib)</b></label>
+                            <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png">
+                        </div>
+                    </fieldset>
                     <button type="submit" class="btn btn-primary w-100" id="submitBtn">
                         <i class="fas fa-upload"></i> Upload Sekarang
                     </button>
@@ -101,6 +97,7 @@
                     <div class="progress" role="progressbar">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" style="width: 0%">0%</div>
                     </div>
+                    <div class="mt-2 text-center" id="progress-text"></div>
                     <div class="mt-3">
                         <strong>Log Proses:</strong>
                         <div id="log-area"></div>
@@ -114,100 +111,111 @@
         const kategoriSelect = document.getElementById('kategori');
         const subKategoriWrapper = document.getElementById('subKategoriWrapper');
         const subKategoriSelect = document.getElementById('sub_kategori');
-
         kategoriSelect.addEventListener('change', function() {
-            if (this.value === 'BIBIT PERSEMAIAN PERMANEN') {
-                subKategoriWrapper.style.display = 'block';
-                subKategoriSelect.required = true;
-            } else {
-                subKategoriWrapper.style.display = 'none';
-                subKategoriSelect.required = false;
-            }
+            subKategoriWrapper.style.display = (this.value === 'BIBIT PERSEMAIAN PERMANEN') ? 'block' : 'none';
         });
 
         const uploadForm = document.getElementById('uploadForm');
         const submitBtn = document.getElementById('submitBtn');
         const filesInput = document.getElementById('files');
-        const usernameInput = document.getElementById('username');
-        const tahunSelect = document.getElementById('tahun');
         const progressSection = document.getElementById('progress-section');
         const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progress-text');
         const logArea = document.getElementById('log-area');
-        const noTeleponInput = document.getElementById('no_telepon');
+        const formFieldset = document.getElementById('form-fieldset');
+
+        const addLog = (message, type = 'info') => {
+            const color = type === 'error' ? 'text-danger' : (type === 'success' ? 'text-success' : '');
+            logArea.innerHTML += `<div class="${color}">[${new Date().toLocaleTimeString()}] ${message}</div>`;
+            logArea.scrollTop = logArea.scrollHeight;
+        };
 
         uploadForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const username = usernameInput.value;
             const files = Array.from(filesInput.files);
-            const tahun = tahunSelect.value;
-            const kategori = kategoriSelect.value;
-            const sub_kategori = subKategoriSelect.value;
-            const no_telepon = noTeleponInput.value;
             const totalFiles = files.length;
-            const batchSize = 50;
 
-            if (!username || totalFiles === 0 || !tahun || !kategori) {
-                alert('Semua pilihan filter, username, dan file harus diisi.');
+            if (totalFiles === 0) {
+                alert('Silakan pilih file foto terlebih dahulu.');
                 return;
             }
 
+            const tahun = document.getElementById('tahun').value;
+            const kategori = document.getElementById('kategori').value;
+            const sub_kategori = document.getElementById('sub_kategori').value;
+            const username = document.getElementById('username').value;
+            const no_telepon = document.getElementById('no_telepon').value;
+            const csrfTokenName = uploadForm.querySelector('input[name=csrf_test_name]').name;
+            const csrfTokenValue = uploadForm.querySelector('input[name=csrf_test_name]').value;
+
+            formFieldset.disabled = true;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Mengupload...';
             progressSection.style.display = 'block';
             logArea.innerHTML = '';
 
             let filesUploaded = 0;
+            let filesFailed = 0;
 
-            for (let i = 0; i < totalFiles; i += batchSize) {
-                const batch = files.slice(i, i + batchSize);
+            addLog(`Memulai proses upload untuk ${totalFiles} foto...`);
+
+            for (const file of files) {
                 const formData = new FormData();
-                // Tambahkan semua data form ke FormData
-                formData.append('username', username);
-                formData.append('no_telepon', no_telepon);
                 formData.append('tahun', tahun);
                 formData.append('kategori', kategori);
                 if (kategori === 'BIBIT PERSEMAIAN PERMANEN' && sub_kategori) {
                     formData.append('sub_kategori', sub_kategori);
                 }
-                formData.append('<?= csrf_token() ?>', '<?= csrf_hash() ?>');
-
-                batch.forEach(file => {
-                    formData.append('files[]', file);
-                });
+                formData.append('username', username);
+                formData.append('no_telepon', no_telepon);
+                formData.append(csrfTokenName, csrfTokenValue);
+                formData.append('files', file);
 
                 try {
-                    addLog(`Mengirim antrian ${i / batchSize + 1} (${batch.length} foto)...`);
                     const response = await fetch('/manajemen-foto/upload', {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
                     });
+
+                    if (!response.ok) {
+                        throw new Error(`Server merespon dengan status ${response.status}`);
+                    }
+
                     const result = await response.json();
 
                     if (result.status === 'success') {
-                        filesUploaded += result.processed;
-                        const percentage = Math.round((filesUploaded / totalFiles) * 100);
-                        progressBar.style.width = percentage + '%';
-                        progressBar.textContent = percentage + '%';
-                        addLog(`> Berhasil: ${result.processed} foto diproses. Total terupload: ${filesUploaded}/${totalFiles}`);
+                        filesUploaded++;
+                        addLog(`(${filesUploaded}/${totalFiles}) Berhasil: ${result.fileName} diupload.`, 'success');
                     } else {
-                        addLog(`> Gagal: ${result.message}. Menghentikan proses.`);
-                        throw new Error(result.message);
+                        filesFailed++;
+                        addLog(`(${filesUploaded}/${totalFiles}) GAGAL: ${file.name}. Pesan: ${result.message}`, 'error');
                     }
-                } catch (error) {
-                    addLog(`> Terjadi error kritis: ${error.message}`);
-                    break;
-                }
-            }
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Upload Selesai';
-            addLog('Semua proses antrian selesai.');
-        });
 
-        function addLog(message) {
-            logArea.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${message}</div>`;
-            logArea.scrollTop = logArea.scrollHeight;
-        }
+                } catch (error) {
+                    filesFailed++;
+                    addLog(`(${filesUploaded}/${totalFiles}) ERROR KRITIS saat mengirim ${file.name}: ${error.message}`, 'error');
+                }
+
+                const processedFiles = filesUploaded + filesFailed;
+                const percentage = totalFiles > 0 ? Math.round((processedFiles / totalFiles) * 100) : 0;
+                progressBar.style.width = percentage + '%';
+                progressBar.textContent = percentage + '%';
+                progressText.textContent = `Memproses ${processedFiles} dari ${totalFiles} foto...`;
+            }
+
+            addLog('------------------------------------');
+            addLog(`Semua proses selesai.`);
+            addLog(`Berhasil: ${filesUploaded} foto.`, 'success');
+            addLog(`Gagal: ${filesFailed} foto.`, 'error');
+
+            formFieldset.disabled = false;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload Sekarang';
+        });
     </script>
 </body>
 
