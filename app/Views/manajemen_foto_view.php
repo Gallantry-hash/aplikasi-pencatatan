@@ -35,7 +35,7 @@
     <div class="container my-4">
         <div class="card">
             <div class="card-body">
-                <h4 class="card-title">Upload Foto Geotagging Baru</h4>
+                <h4 class="card-title">Upload Foto Geotagging</h4>
                 <p class="card-subtitle mb-3 text-muted">Pilih detail, username, dan pilih semua foto yang akan diupload. Field selain foto bersifat opsional.</p>
 
                 <form id="uploadForm">
@@ -72,11 +72,11 @@
                         </div>
                         <div class="mb-3">
                             <label for="username" class="form-label"><b>Username Pengirim</b></label>
-                            <input type="text" class="form-control" name="username" id="username" placeholder="Kosongkan jika tidak diketahui">
+                            <input type="text" class="form-control" name="username" id="username" placeholder="isi nama">
                         </div>
                         <div class="mb-3">
                             <label for="no_telepon" class="form-label"><b>Nomor Telepon Pengirim</b></label>
-                            <input type="tel" class="form-control" name="no_telepon" id="no_telepon" placeholder="Kosongkan jika tidak diketahui">
+                            <input type="tel" class="form-control" name="no_telepon" id="no_telepon" placeholder="isi nomor telepon">
                         </div>
                         <div class="mb-3">
                             <label for="files" class="form-label"><b>Pilih Foto (Wajib)</b></label>

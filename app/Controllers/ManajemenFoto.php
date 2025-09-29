@@ -91,6 +91,7 @@ class ManajemenFoto extends BaseController
 
             $pathArray = [$tahun, $kategori, $username];
             if ($kategori === 'BIBIT PERSEMAIAN PERMANEN' && !empty($sub_kategori)) {
+                // Menyisipkan sub_kategori sebelum username
                 array_splice($pathArray, 2, 0, $sub_kategori);
             }
 
@@ -194,11 +195,10 @@ class ManajemenFoto extends BaseController
                 $lat = $this->convertGpsToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef']);
                 $lon = $this->convertGpsToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef']);
                 $alt = !empty($exif['GPSAltitude']) ? $this->_gpsToFloat($exif['GPSAltitude']) : null;
-                
-                // --- PERBAIKAN FINAL: Validasi menggunakan filter_var untuk keamanan maksimum ---
-                $dbData['gps_latitude']  = filter_var($lat, FILTER_VALIDATE_FLOAT) ? $lat : null;
-                $dbData['gps_longitude'] = filter_var($lon, FILTER_VALIDATE_FLOAT) ? $lon : null;
-                $dbData['gps_altitude']  = filter_var($alt, FILTER_VALIDATE_FLOAT) ? $alt : null;
+
+                $dbData['gps_latitude']  = $lat;
+                $dbData['gps_longitude'] = $lon;
+                $dbData['gps_altitude']  = $alt;
             }
 
             if (!empty($dbData['gps_latitude']) && !empty($dbData['gps_longitude'])) {
@@ -215,60 +215,40 @@ class ManajemenFoto extends BaseController
     }
 
     /**
-     * --- FUNGSI BARU (LEBIH AMAN) ---
-     * Mengonversi nilai pecahan dari EXIF (contoh: "7/1" atau "5591/100") menjadi angka float.
-     * @param string|null $value Nilai dari EXIF
+     * Mengonversi nilai pecahan dari EXIF (contoh: "7/1") menjadi angka float.
+     * @param mixed $value Nilai dari EXIF
      * @return float|null Mengembalikan float jika valid, null jika tidak.
      */
     private function _gpsToFloat($value)
     {
-        if ($value === null) {
-            return null;
-        }
-
-        if (is_numeric($value)) {
-            return (float) $value;
-        }
+        if ($value === null) return null;
+        if (is_numeric($value)) return (float) $value;
 
         if (is_string($value) && strpos($value, '/') !== false) {
             list($numerator, $denominator) = explode('/', $value, 2);
-            
-            // Validasi bahwa keduanya adalah numerik
-            if (!is_numeric($numerator) || !is_numeric($denominator)) {
-                return null;
+            if (is_numeric($numerator) && is_numeric($denominator) && $denominator != 0) {
+                return (float) $numerator / (float) $denominator;
             }
-            
-            $numerator = (float) $numerator;
-            $denominator = (float) $denominator;
-
-            // Mencegah error "Division by zero"
-            if ($denominator == 0) {
-                return null;
-            }
-
-            return $numerator / $denominator;
         }
-
         return null;
     }
 
-
     /**
-     * --- FUNGSI LAMA (DIPERBARUI TOTAL) ---
-     * Fungsi yang jauh lebih tahan banting untuk mengonversi data GPS.
+     * Fungsi yang sangat TAHAN BANTING untuk mengonversi data GPS dari EXIF.
+     * @param mixed $dmsArray
+     * @param mixed $hemisphere
+     * @return float|null
      */
     private function convertGpsToDecimal($dmsArray, $hemisphere)
     {
-        // Pastikan inputnya adalah array
-        if (!is_array($dmsArray)) {
+        if (!is_array($dmsArray) || count($dmsArray) !== 3) {
             return null;
         }
 
-        $degrees = count($dmsArray) > 0 ? $this->_gpsToFloat($dmsArray[0]) : 0;
-        $minutes = count($dmsArray) > 1 ? $this->_gpsToFloat($dmsArray[1]) : 0;
-        $seconds = count($dmsArray) > 2 ? $this->_gpsToFloat($dmsArray[2]) : 0;
+        $degrees = $this->_gpsToFloat($dmsArray[0]);
+        $minutes = $this->_gpsToFloat($dmsArray[1]);
+        $seconds = $this->_gpsToFloat($dmsArray[2]);
         
-        // Jika salah satu komponen gagal dikonversi, batalkan seluruh proses.
         if ($degrees === null || $minutes === null || $seconds === null) {
             return null;
         }
@@ -279,11 +259,13 @@ class ManajemenFoto extends BaseController
             $decimal *= -1;
         }
         
-        return $decimal;
+        // Validasi terakhir untuk memastikan hasilnya adalah angka yang valid
+        return is_finite($decimal) ? $decimal : null;
     }
     
     private function getAlamatDariKoordinat($latitude, $longitude)
     {
+        // Fungsi ini tidak diubah, tetap sama
         try {
             $client = \Config\Services::curlrequest([
                 'baseURI' => 'https://nominatim.openstreetmap.org/',
