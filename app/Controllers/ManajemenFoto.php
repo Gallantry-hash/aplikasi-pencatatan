@@ -91,7 +91,6 @@ class ManajemenFoto extends BaseController
 
             $pathArray = [$tahun, $kategori, $username];
             if ($kategori === 'BIBIT PERSEMAIAN PERMANEN' && !empty($sub_kategori)) {
-                // Menyisipkan sub_kategori sebelum username
                 array_splice($pathArray, 2, 0, $sub_kategori);
             }
 
@@ -107,10 +106,10 @@ class ManajemenFoto extends BaseController
 
             if ($file->isValid() && !$file->hasMoved()) {
                 $result = $this->processAndUploadImage($file->getTempName(), $id_petugas, $fotoModel, $folderId, $file->getClientName());
-                if ($result) {
+                if ($result['status'] === 'success') {
                     $processedCount++;
                 } else {
-                    return $this->response->setJSON(['status' => 'error', 'message' => 'Gagal memproses EXIF atau mengupload file: ' . $file->getClientName()]);
+                    return $this->response->setJSON(['status' => 'error', 'message' => $result['message']]);
                 }
             }
             
@@ -163,12 +162,19 @@ class ManajemenFoto extends BaseController
     
     private function processAndUploadImage($filePath, $id_petugas, $fotoModel, $driveFolderId, $originalName = null)
     {
+        // --- PERBAIKAN NAMA FILE ---
+        // Hentikan proses jika nama file asli tidak valid atau kosong.
+        if (empty($originalName)) {
+            log_message('error', "Gagal memproses file karena nama asli tidak terbaca. Path sementara: {$filePath}");
+            return ['status' => 'error', 'message' => 'Gagal mendapatkan nama file asli.'];
+        }
+        $fileName = $originalName;
+
         try {
             $exif = @exif_read_data($filePath);
-            $fileName = $originalName ?? basename($filePath);
 
             $fileMetadata = new \Google_Service_Drive_DriveFile([
-                'name' => $fileName,
+                'name' => $fileName, // Gunakan variabel yang sudah divalidasi
                 'parents' => [$driveFolderId]
             ]);
             $content = file_get_contents($filePath);
@@ -194,11 +200,9 @@ class ManajemenFoto extends BaseController
             if (!empty($exif['GPSLatitude']) && !empty($exif['GPSLongitude'])) {
                 $lat = $this->convertGpsToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef']);
                 $lon = $this->convertGpsToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef']);
-                $alt = !empty($exif['GPSAltitude']) ? $this->_gpsToFloat($exif['GPSAltitude']) : null;
-
+                
                 $dbData['gps_latitude']  = $lat;
                 $dbData['gps_longitude'] = $lon;
-                $dbData['gps_altitude']  = $alt;
             }
 
             if (!empty($dbData['gps_latitude']) && !empty($dbData['gps_longitude'])) {
@@ -206,16 +210,17 @@ class ManajemenFoto extends BaseController
             }
             
             $fotoModel->save($dbData);
-            return true;
+            return ['status' => 'success'];
 
         } catch (\Exception $e) {
-            log_message('error', "Gagal memproses file {$originalName}: " . $e->getMessage());
-            return false;
+            log_message('error', "Gagal memproses file {$fileName}: " . $e->getMessage());
+            return ['status' => 'error', 'message' => $e->getMessage()];
         }
     }
 
     /**
-     * Mengonversi nilai pecahan dari EXIF (contoh: "7/1") menjadi angka float.
+     * --- PERBAIKAN FINAL GPS ---
+     * Mengonversi nilai pecahan dari EXIF (contoh: "7/1") menjadi angka float menggunakan Regex.
      * @param mixed $value Nilai dari EXIF
      * @return float|null Mengembalikan float jika valid, null jika tidak.
      */
@@ -224,10 +229,12 @@ class ManajemenFoto extends BaseController
         if ($value === null) return null;
         if (is_numeric($value)) return (float) $value;
 
-        if (is_string($value) && strpos($value, '/') !== false) {
-            list($numerator, $denominator) = explode('/', $value, 2);
-            if (is_numeric($numerator) && is_numeric($denominator) && $denominator != 0) {
-                return (float) $numerator / (float) $denominator;
+        // Gunakan Regex untuk mengekstrak angka dengan aman, bahkan dari format aneh
+        if (is_string($value) && preg_match('/^([0-9\.]+)\/([0-9\.]+)$/', $value, $matches)) {
+            $numerator = (float) $matches[1];
+            $denominator = (float) $matches[2];
+            if ($denominator != 0) {
+                return $numerator / $denominator;
             }
         }
         return null;
@@ -255,17 +262,15 @@ class ManajemenFoto extends BaseController
 
         $decimal = $degrees + ($minutes / 60) + ($seconds / 3600);
         
-        if ($hemisphere === 'S' || $hemisphere === 'W') {
+        if (strtoupper($hemisphere) === 'S' || strtoupper($hemisphere) === 'W') {
             $decimal *= -1;
         }
         
-        // Validasi terakhir untuk memastikan hasilnya adalah angka yang valid
         return is_finite($decimal) ? $decimal : null;
     }
     
     private function getAlamatDariKoordinat($latitude, $longitude)
     {
-        // Fungsi ini tidak diubah, tetap sama
         try {
             $client = \Config\Services::curlrequest([
                 'baseURI' => 'https://nominatim.openstreetmap.org/',
