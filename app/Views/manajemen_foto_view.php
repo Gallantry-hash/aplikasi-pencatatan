@@ -78,9 +78,9 @@
                         </div>
                         <div class="mb-3">
                             <label for="files" class="form-label"><b>Pilih Foto (Wajib)</b></label>
-                            <!-- PERUBAHAN DI SINI -->
-                            <small class="form-text text-muted d-block mb-1">Tips: Di HP, pilih dari "File" atau "Dokumen" (bukan "Galeri") untuk mempertahankan nama asli dan lokasi foto.</small>
-                            <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png" capture="filesystem">
+                            <small class="form-text text-muted d-block mb-1"></small>
+                            <!-- PERUBAHAN: Menghapus atribut 'capture' -->
+                            <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png">
                         </div>
                     </fieldset>
                     <button type="submit" class="btn btn-primary w-100" id="submitBtn">
@@ -154,16 +154,12 @@
             addLog(`Memulai proses upload untuk ${totalFiles} foto...`);
 
             for (const file of files) {
-                // Buat FormData baru untuk setiap file
                 const formData = new FormData();
-                // Salin data dari form asli
                 for (const [key, value] of formDataBase.entries()) {
-                    // Jangan salin ulang file inputnya
                     if (key !== 'files[]') {
                         formData.append(key, value);
                     }
                 }
-                // Tambahkan satu file untuk request ini
                 formData.append('files', file);
 
                 try {
@@ -214,3 +210,4 @@
 </body>
 
 </html>
+
