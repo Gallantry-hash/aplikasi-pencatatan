@@ -106,17 +106,17 @@ class ManajemenFoto extends BaseController
             $finalFileName = '';
 
             if ($file->isValid() && !$file->hasMoved()) {
-                // --- SOLUSI NAMA FILE: Buat nama file baru yang informatif ---
+                // --- SOLUSI FINAL NAMA FILE ---
                 $originalName = $file->getClientName();
                 $extension = pathinfo($originalName, PATHINFO_EXTENSION) ?: 'jpg';
                 
-                // Cek apakah nama file asli terlihat seperti nama acak dari HP
+                // Cek apakah nama file asli terlihat seperti nama acak dari HP (hanya angka).
                 if (preg_match('/^[0-9]+(\.jpg|\.jpeg|\.png)$/i', $originalName)) {
-                     // Jika ya, buat nama baru yang informatif
+                     // Jika ya, buat nama baru yang informatif untuk menghindari duplikasi.
                     $safeUsername = preg_replace("/[^A-Za-z0-9]/", '', $username);
                     $finalFileName = strtolower($safeUsername) . '-' . date('Ymd-His') . '-' . bin2hex(random_bytes(2)) . '.' . $extension;
                 } else {
-                    // Jika tidak, gunakan nama file asli
+                    // Jika tidak (nama normal seperti dari laptop), GUNAKAN NAMA FILE ASLI.
                     $finalFileName = $originalName;
                 }
 

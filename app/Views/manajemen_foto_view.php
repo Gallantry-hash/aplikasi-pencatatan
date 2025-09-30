@@ -78,9 +78,8 @@
                         </div>
                         <div class="mb-3">
                             <label for="files" class="form-label"><b>Pilih Foto (Wajib)</b></label>
-                            <!-- PERUBAHAN DI SINI: Kotak info yang jelas -->
                             <div class="alert alert-info" role="alert">
-                                <i class="fas fa-mobile-alt"></i> <strong>Tips untuk Pengguna HP:</strong> Untuk menjaga nama asli dan lokasi GPS, sangat disarankan untuk memilih foto dari <strong>"File Manager"</strong> atau <strong>"Dokumen"</strong>, bukan langsung dari "Galeri".
+                                <i class="fas fa-mobile-alt"></i> <strong>Tips Pengguna HP:</strong> Untuk menjaga lokasi GPS, pilih foto dari <strong>"File Manager"</strong> atau <strong>"Dokumen"</strong>, bukan dari "Galeri".
                             </div>
                             <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png">
                         </div>
@@ -157,11 +156,13 @@
 
             for (const file of files) {
                 const formData = new FormData();
+                // Salin semua data dari form utama, KECUALI field file
                 for (const [key, value] of formDataBase.entries()) {
                     if (key !== 'files[]') {
                         formData.append(key, value);
                     }
                 }
+                // Tambahkan satu file untuk request ini
                 formData.append('files', file);
 
                 try {
