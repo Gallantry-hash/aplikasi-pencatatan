@@ -39,13 +39,11 @@
                 <p class="card-subtitle mb-3 text-muted">Pilih detail, username, dan pilih semua foto yang akan diupload. Field selain foto bersifat opsional.</p>
 
                 <form id="uploadForm">
-                    <!-- Menambahkan CSRF field untuk keamanan -->
                     <?= csrf_field() ?>
                     <fieldset id="form-fieldset">
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="tahun" class="form-label"><b>Tahun</b></label>
-                                <!-- PERBAIKAN: Daftar tahun sekarang statis sesuai permintaan -->
                                 <select class="form-select" id="tahun" name="tahun">
                                     <option value="" disabled selected>-- Pilih Tahun --</option>
                                     <option value="2025">2025</option>
@@ -79,8 +77,10 @@
                             <input type="tel" class="form-control" name="no_telepon" id="no_telepon" placeholder="isi nomor telepon">
                         </div>
                         <div class="mb-3">
-                            <label for="files" class="form-label"><b>Pilih Foto</b></label>
-                            <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png">
+                            <label for="files" class="form-label"><b>Pilih Foto (Wajib)</b></label>
+                            <!-- PERUBAHAN DI SINI -->
+                            <small class="form-text text-muted d-block mb-1">Tips: Di HP, pilih dari "File" atau "Dokumen" (bukan "Galeri") untuk mempertahankan nama asli dan lokasi foto.</small>
+                            <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png" capture="filesystem">
                         </div>
                     </fieldset>
                     <button type="submit" class="btn btn-primary w-100" id="submitBtn">
@@ -110,7 +110,6 @@
     <script>
         const kategoriSelect = document.getElementById('kategori');
         const subKategoriWrapper = document.getElementById('subKategoriWrapper');
-        const subKategoriSelect = document.getElementById('sub_kategori');
         kategoriSelect.addEventListener('change', function() {
             subKategoriWrapper.style.display = (this.value === 'BIBIT PERSEMAIAN PERMANEN') ? 'block' : 'none';
         });
@@ -141,14 +140,8 @@
                 return;
             }
 
-            const tahun = document.getElementById('tahun').value;
-            const kategori = document.getElementById('kategori').value;
-            const sub_kategori = document.getElementById('sub_kategori').value;
-            const username = document.getElementById('username').value;
-            const no_telepon = document.getElementById('no_telepon').value;
-            const csrfTokenName = uploadForm.querySelector('input[name=csrf_test_name]').name;
-            const csrfTokenValue = uploadForm.querySelector('input[name=csrf_test_name]').value;
-
+            const formDataBase = new FormData(uploadForm);
+            
             formFieldset.disabled = true;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Mengupload...';
@@ -161,15 +154,16 @@
             addLog(`Memulai proses upload untuk ${totalFiles} foto...`);
 
             for (const file of files) {
+                // Buat FormData baru untuk setiap file
                 const formData = new FormData();
-                formData.append('tahun', tahun);
-                formData.append('kategori', kategori);
-                if (kategori === 'BIBIT PERSEMAIAN PERMANEN' && sub_kategori) {
-                    formData.append('sub_kategori', sub_kategori);
+                // Salin data dari form asli
+                for (const [key, value] of formDataBase.entries()) {
+                    // Jangan salin ulang file inputnya
+                    if (key !== 'files[]') {
+                        formData.append(key, value);
+                    }
                 }
-                formData.append('username', username);
-                formData.append('no_telepon', no_telepon);
-                formData.append(csrfTokenName, csrfTokenValue);
+                // Tambahkan satu file untuk request ini
                 formData.append('files', file);
 
                 try {

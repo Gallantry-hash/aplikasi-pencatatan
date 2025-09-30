@@ -63,7 +63,7 @@ class ManajemenFoto extends BaseController
         if (!$this->drive) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'Gagal terhubung ke Google Drive. Periksa file log untuk detail.']);
         }
-        
+
         $files = $this->request->getFiles();
 
         if (empty($files['files'])) {
@@ -101,19 +101,23 @@ class ManajemenFoto extends BaseController
 
             $fotoModel = new FotoModel();
             $processedCount = 0;
-            
+
             $file = $files['files'];
 
             if ($file->isValid() && !$file->hasMoved()) {
-                $result = $this->processAndUploadImage($file->getTempName(), $id_petugas, $fotoModel, $folderId, $file->getClientName());
+                // --- SOLUSI NAMA FILE: Kembali menggunakan nama asli dari client ---
+                $originalName = $file->getClientName();
+
+                $result = $this->processAndUploadImage($file->getTempName(), $id_petugas, $fotoModel, $folderId, $originalName);
+
                 if ($result['status'] === 'success') {
                     $processedCount++;
                 } else {
                     return $this->response->setJSON(['status' => 'error', 'message' => $result['message']]);
                 }
             }
-            
-            return $this->response->setJSON(['status' => 'success', 'processed' => $processedCount, 'fileName' => $file->getClientName()]);
+
+            return $this->response->setJSON(['status' => 'success', 'processed' => $processedCount, 'fileName' => $originalName ?? 'N/A']);
         } catch (\Exception $e) {
             log_message('error', '[Upload Error] ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
             return $this->response->setJSON(['status' => 'error', 'message' => 'Terjadi kesalahan di server: ' . $e->getMessage()]);
@@ -135,7 +139,6 @@ class ManajemenFoto extends BaseController
                 $parentId = $this->findOrCreateFolder($folderName, $parentId);
             }
             return $parentId;
-
         } catch (\Exception $e) {
             log_message('error', 'Gagal saat memproses folder: ' . $e->getMessage());
             return null;
@@ -159,22 +162,18 @@ class ManajemenFoto extends BaseController
             return $folder->id;
         }
     }
-    
-    private function processAndUploadImage($filePath, $id_petugas, $fotoModel, $driveFolderId, $originalName = null)
+
+    private function processAndUploadImage($filePath, $id_petugas, $fotoModel, $driveFolderId, $fileName)
     {
-        // --- PERBAIKAN NAMA FILE ---
-        // Hentikan proses jika nama file asli tidak valid atau kosong.
-        if (empty($originalName)) {
-            log_message('error', "Gagal memproses file karena nama asli tidak terbaca. Path sementara: {$filePath}");
-            return ['status' => 'error', 'message' => 'Gagal mendapatkan nama file asli.'];
+        if (empty($fileName)) {
+            return ['status' => 'error', 'message' => 'Nama file tidak valid atau tidak terbaca.'];
         }
-        $fileName = $originalName;
 
         try {
             $exif = @exif_read_data($filePath);
 
             $fileMetadata = new \Google_Service_Drive_DriveFile([
-                'name' => $fileName, // Gunakan variabel yang sudah divalidasi
+                'name' => $fileName,
                 'parents' => [$driveFolderId]
             ]);
             $content = file_get_contents($filePath);
@@ -184,7 +183,7 @@ class ManajemenFoto extends BaseController
                 'uploadType' => 'multipart',
                 'fields' => 'id, webViewLink'
             ]);
-            
+
             $dbData = [
                 'id_petugas' => $id_petugas,
                 'nama_file' => $fileName,
@@ -197,39 +196,43 @@ class ManajemenFoto extends BaseController
                 'orientasi' => $exif['Orientation'] ?? null,
             ];
 
-            if (!empty($exif['GPSLatitude']) && !empty($exif['GPSLongitude'])) {
-                $lat = $this->convertGpsToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef']);
-                $lon = $this->convertGpsToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef']);
-                
-                $dbData['gps_latitude']  = $lat;
-                $dbData['gps_longitude'] = $lon;
+            // Gunakan fungsi helper yang sangat aman untuk mem-parse GPS
+            $gpsData = $this->_parseGpsExif($exif);
+            if ($gpsData) {
+                $dbData['gps_latitude']  = $gpsData['lat'];
+                $dbData['gps_longitude'] = $gpsData['lon'];
+                $dbData['lokasi'] = $this->getAlamatDariKoordinat($gpsData['lat'], $gpsData['lon']);
             }
 
-            if (!empty($dbData['gps_latitude']) && !empty($dbData['gps_longitude'])) {
-                $dbData['lokasi'] = $this->getAlamatDariKoordinat($dbData['gps_latitude'], $dbData['gps_longitude']);
-            }
-            
             $fotoModel->save($dbData);
             return ['status' => 'success'];
-
         } catch (\Exception $e) {
             log_message('error', "Gagal memproses file {$fileName}: " . $e->getMessage());
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
     }
 
-    /**
-     * --- PERBAIKAN FINAL GPS ---
-     * Mengonversi nilai pecahan dari EXIF (contoh: "7/1") menjadi angka float menggunakan Regex.
-     * @param mixed $value Nilai dari EXIF
-     * @return float|null Mengembalikan float jika valid, null jika tidak.
-     */
+    private function _parseGpsExif($exif)
+    {
+        if (empty($exif['GPSLatitude']) || empty($exif['GPSLongitude']) || empty($exif['GPSLatitudeRef']) || empty($exif['GPSLongitudeRef'])) {
+            return null;
+        }
+
+        $lat = $this->convertGpsToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef']);
+        $lon = $this->convertGpsToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef']);
+
+        if ($lat !== null && $lon !== null && is_finite($lat) && is_finite($lon)) {
+            return ['lat' => $lat, 'lon' => $lon];
+        }
+
+        return null;
+    }
+
     private function _gpsToFloat($value)
     {
         if ($value === null) return null;
         if (is_numeric($value)) return (float) $value;
 
-        // Gunakan Regex untuk mengekstrak angka dengan aman, bahkan dari format aneh
         if (is_string($value) && preg_match('/^([0-9\.]+)\/([0-9\.]+)$/', $value, $matches)) {
             $numerator = (float) $matches[1];
             $denominator = (float) $matches[2];
@@ -240,12 +243,6 @@ class ManajemenFoto extends BaseController
         return null;
     }
 
-    /**
-     * Fungsi yang sangat TAHAN BANTING untuk mengonversi data GPS dari EXIF.
-     * @param mixed $dmsArray
-     * @param mixed $hemisphere
-     * @return float|null
-     */
     private function convertGpsToDecimal($dmsArray, $hemisphere)
     {
         if (!is_array($dmsArray) || count($dmsArray) !== 3) {
@@ -255,20 +252,20 @@ class ManajemenFoto extends BaseController
         $degrees = $this->_gpsToFloat($dmsArray[0]);
         $minutes = $this->_gpsToFloat($dmsArray[1]);
         $seconds = $this->_gpsToFloat($dmsArray[2]);
-        
+
         if ($degrees === null || $minutes === null || $seconds === null) {
             return null;
         }
 
         $decimal = $degrees + ($minutes / 60) + ($seconds / 3600);
-        
+
         if (strtoupper($hemisphere) === 'S' || strtoupper($hemisphere) === 'W') {
             $decimal *= -1;
         }
-        
+
         return is_finite($decimal) ? $decimal : null;
     }
-    
+
     private function getAlamatDariKoordinat($latitude, $longitude)
     {
         try {
@@ -297,7 +294,6 @@ class ManajemenFoto extends BaseController
                 }
             }
             return null;
-
         } catch (\Exception $e) {
             log_message('error', 'Gagal melakukan Reverse Geocoding: ' . $e->getMessage());
             return null;
