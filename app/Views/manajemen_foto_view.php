@@ -26,6 +26,10 @@
         .modal-body ul {
             font-size: 0.9rem;
         }
+
+        .file-input-btn {
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 
@@ -81,12 +85,27 @@
                             <input type="tel" class="form-control" name="no_telepon" id="no_telepon" placeholder="isi nomor telepon">
                         </div>
                         <div class="mb-3">
-                            <label for="files" class="form-label"><b>Pilih Foto (Wajib)</b></label>
+                            <label class="form-label"><b>Pilih Foto (Wajib)</b></label>
                             <div class="alert alert-warning p-2" role="alert">
                                 <h5 class="alert-heading" style="font-size: 1rem;"><i class="fas fa-exclamation-triangle"></i> PENTING UNTUK PENGGUNA HP</h5>
-                                <p class="mb-0" style="font-size: 0.9rem;">Untuk menjaga <strong>Nama File Asli</strong> dan <strong>Lokasi GPS</strong>, pilih foto dari <strong>"File Manager"</strong>, <strong>"Files"</strong>, atau <strong>"Dokumen"</strong>. <u>Jangan pilih dari "Galeri" atau "Photos"</u>. <a href="#" data-bs-toggle="modal" data-bs-target="#filePickerModal">Lihat panduan</a>.</p>
+                                <p class="mb-0" style="font-size: 0.9rem;">
+                                    Gunakan < palla untuk mengambil foto langsung. Gunakan <strong>File Manager</strong> untuk mempertahankan <strong>nama file asli</strong> dan <strong>data GPS</strong>. <a href="#" data-bs-toggle="modal" data-bs-target="#filePickerModal">Lihat panduan</a>.
+                                </p>
                             </div>
-                            <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png">
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <label for="galleryInput" class="btn btn-secondary w-100 file-input-btn">
+                                        <i class="fas fa-camera"></i> Ambil dari Galeri/Kamera
+                                        <input type="file" id="galleryInput" name="files[]" multiple accept="image/jpeg,image/png" capture="environment" style="display: none;">
+                                    </label>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label for="fileManagerInput" class="btn btn-primary w-100 file-input-btn">
+                                        <i class="fas fa-folder-open"></i> Pilih dari File Manager
+                                        <input type="file" id="fileManagerInput" name="files[]" multiple accept="image/jpeg,image/png" style="display: none;">
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </fieldset>
                     <button type="submit" class="btn btn-primary w-100" id="submitBtn">
@@ -122,12 +141,13 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Untuk memastikan <strong>nama file asli</strong> dan <strong>data GPS</strong> tetap terjaga, ikuti langkah-langkah berikut saat memilih foto:</p>
+                    <p>Untuk memastikan <strong>nama file asli</strong> dan <strong>data GPS</strong> tetap terjaga, ikuti langkah-langkah berikut:</p>
                     <ul>
-                        <li><strong>Pada Android:</strong> Ketika memilih file, pilih opsi <strong>"File Manager"</strong> atau <strong>"Files"</strong>. Hindari memilih dari <strong>"Galeri"</strong> atau <strong>"Google Photos"</strong>.</li>
-                        <li><strong>Pada iOS:</strong> Pilih <strong>"Browse"</strong> atau <strong>"Files"</strong> dari aplikasi Files. Jangan pilih foto langsung dari <strong>"Photos"</strong>.</li>
-                        <li>Pastikan foto yang Anda pilih memiliki data GPS (EXIF) yang valid jika lokasi diperlukan.</li>
-                        <li>Jika Anda tidak melihat opsi File Manager, coba gunakan browser lain seperti Chrome atau Firefox.</li>
+                        <li><strong>Tombol Galeri/Kamera:</strong> Gunakan untuk mengambil foto baru atau memilih dari galeri. Catatan: Foto dari galeri mungkin kehilangan data GPS.</li>
+                        <li><strong>Tombol File Manager:</strong> Pilih opsi <strong>"File Manager"</strong>, <strong>"Files"</strong>, atau <strong>"Dokumen"</strong> untuk mempertahankan nama file asli dan data GPS.</li>
+                        <li><strong>Pada Android:</strong> Pilih <strong>"Files"</strong> atau <strong>"File Manager"</strong>, bukan <strong>"Galeri"</strong> atau <strong>"Google Photos"</strong>.</li>
+                        <li><strong>Pada iOS:</strong> Pilih <strong>"Browse"</strong> dari aplikasi Files, bukan <strong>"Photos"</strong>.</li>
+                        <li>Jika tidak ada opsi File Manager, coba gunakan browser lain (Chrome/Firefox).</li>
                     </ul>
                 </div>
                 <div class="modal-footer">
@@ -147,7 +167,8 @@
 
         const uploadForm = document.getElementById('uploadForm');
         const submitBtn = document.getElementById('submitBtn');
-        const filesInput = document.getElementById('files');
+        const galleryInput = document.getElementById('galleryInput');
+        const fileManagerInput = document.getElementById('fileManagerInput');
         const progressSection = document.getElementById('progress-section');
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progress-text');
@@ -160,29 +181,43 @@
             logArea.scrollTop = logArea.scrollHeight;
         };
 
-        // Validate file selection
-        filesInput.addEventListener('change', function() {
-            const files = Array.from(this.files);
-            for (const file of files) {
-                // Basic validation: check if file name looks suspicious (e.g., gallery-generated names)
-                if (file.name.match(/^IMG_\d{8}_\d{6}/) || file.name.includes('Screenshot')) {
-                    addLog(`Peringatan: File "${file.name}" mungkin berasal dari galeri. Pastikan memilih dari File Manager untuk menjaga nama asli dan data GPS.`, 'error');
+        // Combine both inputs into a single file list for submission
+        let selectedFiles = [];
+
+        [galleryInput, fileManagerInput].forEach(input => {
+            input.addEventListener('change', function() {
+                selectedFiles = Array.from(this.files);
+                const source = this.id === 'galleryInput' ? 'Galeri/Kamera' : 'File Manager';
+                if (this.id === 'galleryInput') {
+                    addLog(`Peringatan: File dari ${source} mungkin kehilangan data GPS atau nama asli. Disarankan menggunakan File Manager.`, 'error');
+                } else {
+                    addLog(`File dipilih dari ${source}. Memeriksa nama file...`);
+                    for (const file of selectedFiles) {
+                        if (file.name.match(/^IMG_\d{8}_\d{6}/) || file.name.includes('Screenshot')) {
+                            addLog(`Peringatan: File "${file.name}" mungkin berasal dari galeri. Pastikan memilih dari File Manager.`, 'error');
+                        }
+                    }
                 }
-            }
+                // Update the form data with selected files
+                const formData = new FormData(uploadForm);
+                selectedFiles.forEach((file, index) => {
+                    formData.append(`files[${index}]`, file);
+                });
+            });
         });
 
         uploadForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const files = Array.from(filesInput.files);
-            const totalFiles = files.length;
-
-            if (totalFiles === 0) {
+            if (selectedFiles.length === 0) {
                 alert('Silakan pilih file foto terlebih dahulu.');
                 return;
             }
 
-            const formDataBase = new FormData(uploadForm);
+            const formData = new FormData(uploadForm);
+            selectedFiles.forEach((file, index) => {
+                formData.append('files', file);
+            });
 
             formFieldset.disabled = true;
             submitBtn.disabled = true;
@@ -192,52 +227,50 @@
 
             let filesUploaded = 0;
             let filesFailed = 0;
+            const totalFiles = selectedFiles.length;
 
             addLog(`Memulai proses upload untuk ${totalFiles} foto...`);
 
-            for (const file of files) {
-                const formData = new FormData();
-                for (const [key, value] of formDataBase.entries()) {
-                    if (key !== 'files[]') {
-                        formData.append(key, value);
+            try {
+                const response = await fetch('/manajemen-foto/upload', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
                     }
-                }
-                formData.append('files', file);
+                });
 
-                try {
-                    const response = await fetch('/manajemen-foto/upload', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
+                if (!response.ok) {
+                    throw new Error(`Server merespon dengan status ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    result.results.forEach(res => {
+                        if (res.status === 'success') {
+                            filesUploaded++;
+                            addLog(`(${filesUploaded}/${totalFiles}) Berhasil: ${res.fileName} diupload.`, 'success');
+                        } else {
+                            filesFailed++;
+                            addLog(`(${filesUploaded}/${totalFiles}) GAGAL: ${res.fileName}. Pesan: ${res.message}`, 'error');
                         }
                     });
-
-                    if (!response.ok) {
-                        throw new Error(`Server merespon dengan status ${response.status}`);
-                    }
-
-                    const result = await response.json();
-
-                    if (result.status === 'success') {
-                        filesUploaded++;
-                        addLog(`(${filesUploaded}/${totalFiles}) Berhasil: ${result.fileName} diupload.`, 'success');
-                    } else {
-                        filesFailed++;
-                        addLog(`(${filesUploaded}/${totalFiles}) GAGAL: ${file.name}. Pesan: ${result.message}`, 'error');
-                    }
-
-                } catch (error) {
-                    filesFailed++;
-                    addLog(`(${filesUploaded}/${totalFiles}) ERROR KRITIS saat mengirim ${file.name}: ${error.message}`, 'error');
+                } else {
+                    filesFailed += totalFiles;
+                    addLog(`GAGAL: ${result.message}`, 'error');
                 }
 
-                const processedFiles = filesUploaded + filesFailed;
-                const percentage = totalFiles > 0 ? Math.round((processedFiles / totalFiles) * 100) : 0;
-                progressBar.style.width = percentage + '%';
-                progressBar.textContent = percentage + '%';
-                progressText.textContent = `Memproses ${processedFiles} dari ${totalFiles} foto...`;
+            } catch (error) {
+                filesFailed += totalFiles;
+                addLog(`ERROR KRITIS: ${error.message}`, 'error');
             }
+
+            const processedFiles = filesUploaded + filesFailed;
+            const percentage = totalFiles > 0 ? Math.round((processedFiles / totalFiles) * 100) : 0;
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = percentage + '%';
+            progressText.textContent = `Memproses ${processedFiles} dari ${totalFiles} foto...`;
 
             addLog('------------------------------------');
             addLog(`Semua proses selesai.`);
@@ -247,8 +280,8 @@
             formFieldset.disabled = false;
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload Sekarang';
+            selectedFiles = []; // Reset selected files
         });
     </script>
 </body>
-
 </html>

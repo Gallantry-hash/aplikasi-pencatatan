@@ -63,9 +63,8 @@ class ManajemenFoto extends BaseController
         if (!$this->drive) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'Gagal terhubung ke Google Drive. Periksa file log untuk detail.']);
         }
-        
-        $files = $this->request->getFiles();
 
+        $files = $this->request->getFiles();
         if (empty($files['files'])) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'File foto tidak ditemukan dalam permintaan.']);
         }
@@ -75,7 +74,6 @@ class ManajemenFoto extends BaseController
         $tahun        = $this->request->getPost('tahun') ?: date('Y');
         $kategori     = $this->request->getPost('kategori') ?: 'TANPA KATEGORI';
         $sub_kategori = $this->request->getPost('sub_kategori');
-
 
         try {
             $petugasModel = new PetugasModel();
@@ -101,24 +99,44 @@ class ManajemenFoto extends BaseController
 
             $fotoModel = new FotoModel();
             $processedCount = 0;
-            
-            $file = $files['files'];
-            $finalFileName = '';
+            $results = [];
 
-            if ($file->isValid() && !$file->hasMoved()) {
-                // --- SOLUSI SESUAI ATURAN #1: SELALU GUNAKAN NAMA ASLI ---
-                $finalFileName = $file->getClientName();
+            foreach ($files['files'] as $file) {
+                if ($file->isValid() && !$file->hasMoved()) {
+                    $finalFileName = $file->getClientName();
+                    if (preg_match('/^IMG_\d{8}_\d{6}/', $finalFileName)) {
+                        log_message('warning', "File {$finalFileName} memiliki pola nama seperti galeri.");
+                        $results[] = [
+                            'fileName' => $finalFileName,
+                            'status' => 'error',
+                            'message' => "File {$finalFileName} memiliki nama seperti dari galeri. Pilih dari File Manager untuk data GPS."
+                        ];
+                        continue;
+                    }
 
-                $result = $this->processAndUploadImage($file->getTempName(), $id_petugas, $fotoModel, $folderId, $finalFileName);
-
-                if ($result['status'] === 'success') {
-                    $processedCount++;
+                    $result = $this->processAndUploadImage($file->getTempName(), $id_petugas, $fotoModel, $folderId, $finalFileName);
+                    $results[] = [
+                        'fileName' => $finalFileName,
+                        'status' => $result['status'],
+                        'message' => $result['message'] ?? 'Success'
+                    ];
+                    if ($result['status'] === 'success') {
+                        $processedCount++;
+                    }
                 } else {
-                    return $this->response->setJSON(['status' => 'error', 'message' => $result['message']]);
+                    $results[] = [
+                        'fileName' => $file->getClientName(),
+                        'status' => 'error',
+                        'message' => 'File tidak valid atau sudah dipindahkan.'
+                    ];
                 }
             }
-            
-            return $this->response->setJSON(['status' => 'success', 'processed' => $processedCount, 'fileName' => $finalFileName]);
+
+            return $this->response->setJSON([
+                'status' => 'success',
+                'processed' => $processedCount,
+                'results' => $results
+            ]);
 
         } catch (\Exception $e) {
             log_message('error', '[Upload Error] ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
@@ -165,7 +183,7 @@ class ManajemenFoto extends BaseController
             return $folder->id;
         }
     }
-    
+
     private function processAndUploadImage($filePath, $id_petugas, $fotoModel, $driveFolderId, $fileName)
     {
         if (empty($fileName)) {
@@ -174,6 +192,10 @@ class ManajemenFoto extends BaseController
 
         try {
             $exif = @exif_read_data($filePath);
+            if (!$exif || empty($exif['GPSLatitude']) || empty($exif['GPSLongitude'])) {
+                log_message('warning', "File {$fileName} tidak memiliki data GPS, kemungkinan dipilih dari galeri.");
+                return ['status' => 'error', 'message' => "File {$fileName} tidak memiliki data GPS. Pastikan memilih dari File Manager."];
+            }
 
             $fileMetadata = new \Google_Service_Drive_DriveFile([
                 'name' => $fileName,
@@ -186,7 +208,7 @@ class ManajemenFoto extends BaseController
                 'uploadType' => 'multipart',
                 'fields' => 'id, webViewLink'
             ]);
-            
+
             $dbData = [
                 'id_petugas' => $id_petugas,
                 'nama_file' => $fileName,
@@ -199,14 +221,13 @@ class ManajemenFoto extends BaseController
                 'orientasi' => $exif['Orientation'] ?? null,
             ];
 
-            // Gunakan fungsi helper yang sangat aman untuk mem-parse GPS
             $gpsData = $this->_parseGpsExif($exif);
             if ($gpsData) {
                 $dbData['gps_latitude']  = $gpsData['lat'];
                 $dbData['gps_longitude'] = $gpsData['lon'];
                 $dbData['lokasi'] = $this->getAlamatDariKoordinat($gpsData['lat'], $gpsData['lon']);
             }
-            
+
             $fotoModel->save($dbData);
             return ['status' => 'success'];
 
@@ -215,7 +236,7 @@ class ManajemenFoto extends BaseController
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
     }
-    
+
     private function _parseGpsExif($exif)
     {
         if (empty($exif['GPSLatitude']) || empty($exif['GPSLongitude']) || empty($exif['GPSLatitudeRef']) || empty($exif['GPSLongitudeRef'])) {
@@ -256,20 +277,20 @@ class ManajemenFoto extends BaseController
         $degrees = $this->_gpsToFloat($dmsArray[0]);
         $minutes = $this->_gpsToFloat($dmsArray[1]);
         $seconds = $this->_gpsToFloat($dmsArray[2]);
-        
+
         if ($degrees === null || $minutes === null || $seconds === null) {
             return null;
         }
 
         $decimal = $degrees + ($minutes / 60) + ($seconds / 3600);
-        
+
         if (strtoupper($hemisphere) === 'S' || strtoupper($hemisphere) === 'W') {
             $decimal *= -1;
         }
-        
+
         return is_finite($decimal) ? $decimal : null;
     }
-    
+
     private function getAlamatDariKoordinat($latitude, $longitude)
     {
         try {
@@ -281,9 +302,9 @@ class ManajemenFoto extends BaseController
             $response = $client->request('GET', 'reverse', [
                 'query' => [
                     'format' => 'json',
-                    'lat'    => $latitude,
-                    'lon'    => $longitude,
-                    'zoom'   => 18,
+                    'lat' => $latitude,
+                    'lon' => $longitude,
+                    'zoom' => 18,
                     'addressdetails' => 1
                 ],
                 'headers' => [
