@@ -79,7 +79,7 @@
                             <input type="tel" class="form-control" name="no_telepon" id="no_telepon" placeholder="isi nomor telepon">
                         </div>
                         <div class="mb-3">
-                            <label for="files" class="form-label"><b>Pilih Foto (Wajib)</b></label>
+                            <label for="files" class="form-label"><b>Pilih Foto</b></label>
                             <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png">
                         </div>
                     </fieldset>
