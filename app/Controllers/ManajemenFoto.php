@@ -106,19 +106,8 @@ class ManajemenFoto extends BaseController
             $finalFileName = '';
 
             if ($file->isValid() && !$file->hasMoved()) {
-                // --- SOLUSI FINAL NAMA FILE ---
-                $originalName = $file->getClientName();
-                $extension = pathinfo($originalName, PATHINFO_EXTENSION) ?: 'jpg';
-                
-                // Cek apakah nama file asli terlihat seperti nama acak dari HP (hanya angka).
-                if (preg_match('/^[0-9]+(\.jpg|\.jpeg|\.png)$/i', $originalName)) {
-                     // Jika ya, buat nama baru yang informatif untuk menghindari duplikasi.
-                    $safeUsername = preg_replace("/[^A-Za-z0-9]/", '', $username);
-                    $finalFileName = strtolower($safeUsername) . '-' . date('Ymd-His') . '-' . bin2hex(random_bytes(2)) . '.' . $extension;
-                } else {
-                    // Jika tidak (nama normal seperti dari laptop), GUNAKAN NAMA FILE ASLI.
-                    $finalFileName = $originalName;
-                }
+                // --- SOLUSI SESUAI ATURAN #1: SELALU GUNAKAN NAMA ASLI ---
+                $finalFileName = $file->getClientName();
 
                 $result = $this->processAndUploadImage($file->getTempName(), $id_petugas, $fotoModel, $folderId, $finalFileName);
 
@@ -180,7 +169,7 @@ class ManajemenFoto extends BaseController
     private function processAndUploadImage($filePath, $id_petugas, $fotoModel, $driveFolderId, $fileName)
     {
         if (empty($fileName)) {
-            return ['status' => 'error', 'message' => 'Nama file tidak valid.'];
+            return ['status' => 'error', 'message' => 'Nama file tidak valid atau kosong.'];
         }
 
         try {
