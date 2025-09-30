@@ -22,6 +22,10 @@
             padding: 10px;
             border-radius: 5px;
         }
+
+        .modal-body ul {
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 
@@ -78,12 +82,10 @@
                         </div>
                         <div class="mb-3">
                             <label for="files" class="form-label"><b>Pilih Foto (Wajib)</b></label>
-                            <!-- SOLUSI ATURAN #5: INSTRUKSI YANG SANGAT JELAS UNTUK PENGGUNA HP -->
                             <div class="alert alert-warning p-2" role="alert">
                                 <h5 class="alert-heading" style="font-size: 1rem;"><i class="fas fa-exclamation-triangle"></i> PENTING UNTUK PENGGUNA HP</h5>
-                                <p class="mb-0" style="font-size: 0.9rem;">Untuk menjaga **Nama File Asli** dan **Lokasi GPS**, Anda **WAJIB** memilih foto dari **"File Manager"**, **"Files"**, atau **"Dokumen"**. Jangan pilih dari "Galeri".</p>
+                                <p class="mb-0" style="font-size: 0.9rem;">Untuk menjaga <strong>Nama File Asli</strong> dan <strong>Lokasi GPS</strong>, pilih foto dari <strong>"File Manager"</strong>, <strong>"Files"</strong>, atau <strong>"Dokumen"</strong>. <u>Jangan pilih dari "Galeri" atau "Photos"</u>. <a href="#" data-bs-toggle="modal" data-bs-target="#filePickerModal">Lihat panduan</a>.</p>
                             </div>
-                            <!-- Input file standar tanpa atribut 'capture' -->
                             <input class="form-control" type="file" name="files[]" id="files" multiple required accept="image/jpeg,image/png">
                         </div>
                     </fieldset>
@@ -111,6 +113,31 @@
         </div>
     </div>
 
+    <!-- Modal for File Picker Instructions -->
+    <div class="modal fade" id="filePickerModal" tabindex="-1" aria-labelledby="filePickerModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="filePickerModalLabel">Panduan Memilih Foto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Untuk memastikan <strong>nama file asli</strong> dan <strong>data GPS</strong> tetap terjaga, ikuti langkah-langkah berikut saat memilih foto:</p>
+                    <ul>
+                        <li><strong>Pada Android:</strong> Ketika memilih file, pilih opsi <strong>"File Manager"</strong> atau <strong>"Files"</strong>. Hindari memilih dari <strong>"Galeri"</strong> atau <strong>"Google Photos"</strong>.</li>
+                        <li><strong>Pada iOS:</strong> Pilih <strong>"Browse"</strong> atau <strong>"Files"</strong> dari aplikasi Files. Jangan pilih foto langsung dari <strong>"Photos"</strong>.</li>
+                        <li>Pastikan foto yang Anda pilih memiliki data GPS (EXIF) yang valid jika lokasi diperlukan.</li>
+                        <li>Jika Anda tidak melihat opsi File Manager, coba gunakan browser lain seperti Chrome atau Firefox.</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const kategoriSelect = document.getElementById('kategori');
         const subKategoriWrapper = document.getElementById('subKategoriWrapper');
@@ -133,6 +160,17 @@
             logArea.scrollTop = logArea.scrollHeight;
         };
 
+        // Validate file selection
+        filesInput.addEventListener('change', function() {
+            const files = Array.from(this.files);
+            for (const file of files) {
+                // Basic validation: check if file name looks suspicious (e.g., gallery-generated names)
+                if (file.name.match(/^IMG_\d{8}_\d{6}/) || file.name.includes('Screenshot')) {
+                    addLog(`Peringatan: File "${file.name}" mungkin berasal dari galeri. Pastikan memilih dari File Manager untuk menjaga nama asli dan data GPS.`, 'error');
+                }
+            }
+        });
+
         uploadForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
@@ -145,7 +183,7 @@
             }
 
             const formDataBase = new FormData(uploadForm);
-            
+
             formFieldset.disabled = true;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Mengupload...';
@@ -214,4 +252,3 @@
 </body>
 
 </html>
-
