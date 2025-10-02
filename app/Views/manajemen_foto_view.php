@@ -109,152 +109,154 @@
         </div>
     </div>
 
-   <script>
-    const kategoriSelect = document.getElementById('kategori');
-    const subKategoriWrapper = document.getElementById('subKategoriWrapper');
-    kategoriSelect.addEventListener('change', function() {
-        subKategoriWrapper.style.display = (this.value === 'BIBIT PERSEMAIAN PERMANEN') ? 'block' : 'none';
-    });
+    <script>
+        const kategoriSelect = document.getElementById('kategori');
+        const subKategoriWrapper = document.getElementById('subKategoriWrapper');
+        kategoriSelect.addEventListener('change', function() {
+            subKategoriWrapper.style.display = (this.value === 'BIBIT PERSEMAIAN PERMANEN') ? 'block' : 'none';
+        });
 
-    const uploadForm = document.getElementById('uploadForm');
-    const submitBtn = document.getElementById('submitBtn');
-    const filesInput = document.getElementById('files');
-    const progressSection = document.getElementById('progress-section');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progress-text');
-    const logArea = document.getElementById('log-area');
-    const formFieldset = document.getElementById('form-fieldset');
-    const cancelBtn = document.getElementById('cancelBtn'); // --- BARU: Ambil tombol batal
+        const uploadForm = document.getElementById('uploadForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const filesInput = document.getElementById('files');
+        const progressSection = document.getElementById('progress-section');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progress-text');
+        const logArea = document.getElementById('log-area');
+        const formFieldset = document.getElementById('form-fieldset');
+        const cancelBtn = document.getElementById('cancelBtn');
 
-    const allowedExtensions = /(\.jpg|\.jpeg|\.png|\.pdf|\.zip)$/i;
-    const maxFileSize = 5 * 1024 * 1024; // --- BARU: 5 MB dalam bytes
-    let isCancelled = false; // --- BARU: Flag untuk status pembatalan
+        const allowedExtensions = /(\.jpg|\.jpeg|\.png|\.pdf|\.zip)$/i;
+        const maxFileSize = 5 * 1024 * 1024;
 
-    // Validasi file saat dipilih
-    filesInput.addEventListener('change', function() {
-        const files = Array.from(this.files);
-        
-        // --- BARU: Validasi ekstensi dan ukuran file
-        const invalidFiles = files.filter(file => !allowedExtensions.exec(file.name));
-        const oversizedFiles = files.filter(file => file.size > maxFileSize);
+        // --- BARU: AbortController untuk membatalkan fetch ---
+        let abortController;
 
-        if (invalidFiles.length > 0) {
-            const invalidNames = invalidFiles.map(f => f.name).join(', ');
-            alert(`File tidak valid: ${invalidNames}\n\nMohon pilih hanya file dengan ekstensi .jpg, .jpeg, .png, .pdf, atau .zip.`);
-            this.value = ''; // Mengosongkan pilihan file
-            return;
-        }
-        
-        if (oversizedFiles.length > 0) {
-            const oversizedNames = oversizedFiles.map(f => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join('\n');
-            alert(`Ukuran file melebihi batas 5 MB:\n\n${oversizedNames}`);
-            this.value = ''; // Mengosongkan pilihan file
-        }
-    });
+        filesInput.addEventListener('change', function() {
+            // ... (fungsi ini tetap sama, tidak perlu diubah)
+            const files = Array.from(this.files);
+            const invalidFiles = files.filter(file => !allowedExtensions.exec(file.name));
+            const oversizedFiles = files.filter(file => file.size > maxFileSize);
 
-    const addLog = (message, type = 'info') => {
-        const color = type === 'error' ? 'text-danger' : (type === 'success' ? 'text-success' : (type === 'warning' ? 'text-warning' : ''));
-        logArea.innerHTML += `<div class="${color}">[${new Date().toLocaleTimeString()}] ${message}</div>`;
-        logArea.scrollTop = logArea.scrollHeight;
-    };
-
-    // --- BARU: Fungsi untuk mereset UI ke keadaan semula
-    const resetUI = () => {
-        formFieldset.disabled = false;
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload Sekarang';
-        cancelBtn.style.display = 'none'; // Sembunyikan tombol batal
-    };
-
-    // --- BARU: Event listener untuk tombol batal
-    cancelBtn.addEventListener('click', () => {
-        isCancelled = true;
-        addLog('Proses upload dibatalkan oleh pengguna...', 'warning');
-    });
-
-    uploadForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const files = Array.from(filesInput.files);
-        const totalFiles = files.length;
-        if (totalFiles === 0) {
-            alert('Silakan pilih file terlebih dahulu.');
-            return;
-        }
-        
-        // --- BARU: Reset status pembatalan setiap kali submit
-        isCancelled = false; 
-
-        const formDataBase = new FormData(uploadForm);
-        formFieldset.disabled = true;
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Mengupload...';
-        progressSection.style.display = 'block';
-        cancelBtn.style.display = 'block'; // Tampilkan tombol batal
-        logArea.innerHTML = '';
-
-        let filesUploaded = 0;
-        let filesFailed = 0;
-
-        addLog(`Memulai proses upload untuk ${totalFiles} file...`);
-
-        for (const file of files) {
-            // --- BARU: Cek apakah proses dibatalkan sebelum mengirim file berikutnya
-            if (isCancelled) {
-                break; // Keluar dari loop
+            if (invalidFiles.length > 0) {
+                const invalidNames = invalidFiles.map(f => f.name).join(', ');
+                alert(`File tidak valid: ${invalidNames}\n\nMohon pilih hanya file dengan ekstensi .jpg, .jpeg, .png, .pdf, atau .zip.`);
+                this.value = '';
+                return;
             }
 
-            const formData = new FormData();
-            for (const [key, value] of formDataBase.entries()) {
-                if (key !== 'files[]') {
-                    formData.append(key, value);
+            if (oversizedFiles.length > 0) {
+                const oversizedNames = oversizedFiles.map(f => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join('\n');
+                alert(`Ukuran file melebihi batas 5 MB:\n\n${oversizedNames}`);
+                this.value = '';
+            }
+        });
+
+        const addLog = (message, type = 'info') => {
+            const color = type === 'error' ? 'text-danger' : (type === 'success' ? 'text-success' : (type === 'warning' ? 'text-warning' : ''));
+            logArea.innerHTML += `<div class="${color}">[${new Date().toLocaleTimeString()}] ${message}</div>`;
+            logArea.scrollTop = logArea.scrollHeight;
+        };
+
+        const resetUI = () => {
+            formFieldset.disabled = false;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload Sekarang';
+            cancelBtn.style.display = 'none';
+        };
+
+        // --- DIUBAH: Panggil abort() saat tombol batal diklik ---
+        cancelBtn.addEventListener('click', () => {
+            if (abortController) {
+                abortController.abort(); // Ini akan membatalkan fetch yang sedang berjalan
+            }
+        });
+
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const files = Array.from(filesInput.files);
+            const totalFiles = files.length;
+            if (totalFiles === 0) {
+                alert('Silakan pilih file terlebih dahulu.');
+                return;
+            }
+
+            // --- BARU: Buat instance AbortController baru setiap kali upload dimulai ---
+            abortController = new AbortController();
+
+            const formDataBase = new FormData(uploadForm);
+            formFieldset.disabled = true;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Mengupload...';
+            progressSection.style.display = 'block';
+            cancelBtn.style.display = 'block';
+            logArea.innerHTML = '';
+            let filesUploaded = 0;
+            let filesFailed = 0;
+            addLog(`Memulai proses upload untuk ${totalFiles} file...`);
+
+            for (const file of files) {
+                const formData = new FormData();
+                for (const [key, value] of formDataBase.entries()) {
+                    if (key !== 'files[]') {
+                        formData.append(key, value);
+                    }
                 }
-            }
-            formData.append('files', file);
+                formData.append('files', file);
 
-            try {
-                const response = await fetch('/manajemen-foto/upload', {
-                    method: 'POST',
-                    body: formData,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                });
+                try {
+                    // --- DIUBAH: Tambahkan 'signal' ke fetch ---
+                    const response = await fetch('/manajemen-foto/upload', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        signal: abortController.signal // Ini menghubungkan fetch dengan controller
+                    });
 
-                if (!response.ok) throw new Error(`Server merespon dengan status ${response.status}`);
-                
-                const result = await response.json();
+                    if (!response.ok) throw new Error(`Server merespon dengan status ${response.status}`);
 
-                if (result.status === 'success') {
-                    filesUploaded++;
-                    const successMessage = result.message || `${result.fileName} berhasil diupload.`;
-                    addLog(`(${filesUploaded}/${totalFiles}) Berhasil: ${successMessage}`, 'success');
-                } else {
-                    filesFailed++;
-                    addLog(`(${filesUploaded + filesFailed}/${totalFiles}) GAGAL: ${file.name}. Pesan: ${result.message}`, 'error');
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        filesUploaded++;
+                        const successMessage = result.message || `${result.fileName} berhasil diupload.`;
+                        addLog(`(${filesUploaded + filesFailed}/${totalFiles}) Berhasil: ${successMessage}`, 'success');
+                    } else {
+                        filesFailed++;
+                        addLog(`(${filesUploaded + filesFailed}/${totalFiles}) GAGAL: ${file.name}. Pesan: ${result.message}`, 'error');
+                    }
+                } catch (error) {
+                    // --- DIUBAH: Tangani error pembatalan secara spesifik ---
+                    if (error.name === 'AbortError') {
+                        addLog(`Upload file ${file.name} dibatalkan.`, 'warning');
+                        // Karena semua proses dibatalkan, kita bisa keluar dari loop
+                        break;
+                    } else {
+                        filesFailed++;
+                        addLog(`(${filesUploaded + filesFailed}/${totalFiles}) ERROR KRITIS saat mengirim ${file.name}: ${error.message}`, 'error');
+                    }
                 }
-            } catch (error) {
-                filesFailed++;
-                addLog(`(${filesUploaded + filesFailed}/${totalFiles}) ERROR KRITIS saat mengirim ${file.name}: ${error.message}`, 'error');
+
+                const processedFiles = filesUploaded + filesFailed;
+                const percentage = totalFiles > 0 ? Math.round((processedFiles / totalFiles) * 100) : 0;
+                progressBar.style.width = percentage + '%';
+                progressBar.textContent = percentage + '%';
+                progressText.textContent = `Memproses ${processedFiles} dari ${totalFiles} file...`;
             }
 
-            const processedFiles = filesUploaded + filesFailed;
-            const percentage = totalFiles > 0 ? Math.round((processedFiles / totalFiles) * 100) : 0;
-            progressBar.style.width = percentage + '%';
-            progressBar.textContent = percentage + '%';
-            progressText.textContent = `Memproses ${processedFiles} dari ${totalFiles} file...`;
-        }
-
-        addLog('------------------------------------');
-        if(isCancelled) {
-            addLog('Proses dihentikan.');
-        } else {
-            addLog('Semua proses selesai.');
-        }
-        addLog(`Berhasil: ${filesUploaded} file.`, 'success');
-        addLog(`Gagal: ${filesFailed} file.`, 'error');
-
-        resetUI(); // Panggil fungsi reset UI
-    });
-</script>
+            addLog('------------------------------------');
+            if (abortController.signal.aborted) {
+                addLog('Proses dihentikan oleh pengguna.');
+            } else {
+                addLog('Semua proses selesai.');
+            }
+            addLog(`Berhasil: ${filesUploaded} file.`, 'success');
+            addLog(`Gagal: ${filesFailed} file.`, 'error');
+            resetUI();
+        });
+    </script>
 </body>
 
 </html>
