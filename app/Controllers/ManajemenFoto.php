@@ -69,6 +69,13 @@ class ManajemenFoto extends BaseController
             return $this->response->setJSON(['status' => 'error', 'message' => 'File tidak ditemukan dalam permintaan.']);
         }
 
+        $file = $files['files'];
+        $maxSize = 5 * 1024 * 1024; // 5 MB
+
+        if ($file->getSize() > $maxSize) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Gagal: Ukuran file ' . $file->getClientName() . ' melebihi batas maksimal 5 MB.']);
+        }
+
         $username     = $this->request->getPost('username') ?: 'TIDAK DIKETAHUI';
         $no_telepon   = $this->request->getPost('no_telepon') ?: '0000';
         $tahun        = $this->request->getPost('tahun') ?: date('Y');
@@ -92,7 +99,6 @@ class ManajemenFoto extends BaseController
             }
 
             $fotoModel = new FotoModel();
-            $file = $files['files'];
             $originalName = $file->getClientName();
 
             // Logika baru untuk menangani tipe file yang berbeda
